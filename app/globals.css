@@ -1,0 +1,17 @@
+/* app/globals.css — Tailwind v3 style */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional project tokens */
+:root {
+  --gc-bg: #f2eddb;
+  --gc-primary: #d40000;
+  --gc-gold: #ba8437;
+  --gc-neutral: #c4baad;
+  --gc-light: #fffcf9;
+}
+
+body { background: var(--gc-bg); }
+
+
