@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebaseConfig';
 import { doc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 
@@ -13,6 +13,8 @@ import { correctAnswers as correctAnswersExam4 } from '@/lib/constants/correctAn
 import { getReadingStudentAnswer } from '@/lib/dashboard/getReadingStudentAnswer';
 
 type SectionKey = 'readingTest1' | 'readingTest2' | 'readingTest3' | 'readingTest4';
+
+type Source = 'attempts' | 'results';
 
 type ReadingSubmissionDoc = {
   studentName?: string;
@@ -30,7 +32,20 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 export default function ReadingSubmissionDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const id = params?.id as string;
+
+  // ✅ read source from URL (?source=attempts|results)
+  const source: Source = useMemo(() => {
+    const s = searchParams.get('source');
+    return s === 'results' ? 'results' : 'attempts';
+  }, [searchParams]);
+
+  // ✅ pick correct collection
+  const collectionName = useMemo(() => {
+    return source === 'results' ? 'readingExamResults' : 'readingExamAttempts';
+  }, [source]);
 
   const [submission, setSubmission] = useState<ReadingSubmissionDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +54,9 @@ export default function ReadingSubmissionDetailPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const ref = doc(db, 'readingExamAttempts', id);
+        setLoading(true);
+
+        const ref = doc(db, collectionName, id);
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
@@ -67,20 +84,21 @@ export default function ReadingSubmissionDetailPage() {
         });
       } catch (err) {
         console.error('Error loading submission:', err);
+        setSubmission(null);
       } finally {
         setLoading(false);
       }
     };
 
-    load();
-  }, [id]);
+    if (id) load();
+  }, [id, collectionName]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this reading exam submission?')) return;
 
     try {
       setDeleting(true);
-      await deleteDoc(doc(db, 'readingExamAttempts', id));
+      await deleteDoc(doc(db, collectionName, id));
       router.push('/reading-dashboard');
     } catch (err) {
       console.error('Error deleting submission:', err);
@@ -163,9 +181,7 @@ export default function ReadingSubmissionDetailPage() {
       return (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm md:text-base font-semibold capitalize">
-              {sectionKey}
-            </h3>
+            <h3 className="text-sm md:text-base font-semibold capitalize">{sectionKey}</h3>
             <span className="text-xs md:text-sm">
               Score:{' '}
               <span className="font-semibold text-primary">
@@ -195,7 +211,9 @@ export default function ReadingSubmissionDetailPage() {
     // EXAM 4 (numeric arrays inside correctAnswersExam4.readingExam4)
     // =========================
     if (examId === 'reading-exam-4') {
-      const correctArray = (correctAnswersExam4 as any)?.readingExam4?.[sectionKey] as number[] | undefined;
+      const correctArray = (correctAnswersExam4 as any)?.readingExam4?.[sectionKey] as
+        | number[]
+        | undefined;
 
       if (!correctArray) {
         return (
@@ -245,9 +263,7 @@ export default function ReadingSubmissionDetailPage() {
       return (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm md:text-base font-semibold capitalize">
-              {sectionKey}
-            </h3>
+            <h3 className="text-sm md:text-base font-semibold capitalize">{sectionKey}</h3>
             <span className="text-xs md:text-sm">
               Score:{' '}
               <span className="font-semibold text-primary">
@@ -388,11 +404,16 @@ export default function ReadingSubmissionDetailPage() {
             </h1>
             <p className="text-xs md:text-sm text-gray-700 mt-1">
               Submission ID:{' '}
-              <span className="font-mono break-all text-[11px] md:text-xs">
-                {id}
+              <span className="font-mono break-all text-[11px] md:text-xs">{id}</span>
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
+              Source:{' '}
+              <span className="font-semibold">
+                {source === 'results' ? 'Results (readingExamResults)' : 'Attempts (readingExamAttempts)'}
               </span>
             </p>
           </div>
+
           <div className="flex gap-2">
             <button
               className="btn btn-sm md:btn-md"
@@ -400,6 +421,7 @@ export default function ReadingSubmissionDetailPage() {
             >
               Back
             </button>
+
             <button
               className="btn btn-error btn-sm md:btn-md"
               disabled={deleting}
@@ -440,5 +462,3 @@ export default function ReadingSubmissionDetailPage() {
     </main>
   );
 }
-
-
